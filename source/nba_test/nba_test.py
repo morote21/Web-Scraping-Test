@@ -18,10 +18,18 @@ class NBAScraper():
         
 
     # Comprobar accesibilidad al sitio web
-    def check_accessibility(self, url) -> bool:
+    def check_accessibility(self, url_robots, url) -> bool:
+        # https://docs.python.org/3/library/urllib.robotparser.html
+
+        # Establece en el parser la url a robots.txt
+        self.rp.set_url(url=url_robots)
+        # Parsea robots.txt
+        self.rp.read()
+        # Examina que user_agent pueda acceder en base al robots.txt parseado
         return self.rp.can_fetch(useragent=self.user_agent, url=url)
     
 
+    # Cerrar driver
     def quit_driver(self):
         self.driver.quit()
 
@@ -29,7 +37,7 @@ class NBAScraper():
 def main():
     user_agent_windows = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
     scraper = NBAScraper(user_agent=user_agent_windows)
-    print(scraper.check_accessibility("https://www.nba.com/stats"))
+    print(scraper.check_accessibility("https://www.nba.com/robots.txt", "https://www.nba.com/stats"))
 
     scraper.quit_driver()
 
