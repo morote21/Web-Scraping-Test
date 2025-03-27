@@ -81,10 +81,37 @@ class NBAScraper():
         url_stats = f"{self.base_url}stats/teams/shooting"
 
         def get_table_contents(html):
+            # Creamos objeto BeautifulSoup
             soup = BeautifulSoup(html, "html.parser")
+
+            # Extraemos la tabla de estadisticas
+            teams_table = soup.find("table", class_="Crom_table__p1iZz")
+
+            # Obtenemos las columnas de cada estadistica
+            table_head = teams_table.find("thead")
+
+            # Crom_headers__mzI_m -> Cabecera perteneciente a FGM, FGA, FG%
+            # el apartado field contiene adicionalmente a que rango de tiro pertenece
+            categories = [col.get("field") for col in table_head.find("tr", class_="Crom_headers__mzI_m").find_all("th")[1:]]
+            teams_content = dict()
+            table_body = teams_table.find("tbody").find_all("tr")
+            for tr in table_body:
+                team_info = tr.find_all("td")
+                team_name = team_info[0].get_text()
+                team_stats = [float(stats.get_text()) for stats in team_info[1:]]
+                
+                # Categorias y estadisticas deben tener la misma longitud, deberia cumplirse siempre
+                assert len(categories) == len(team_stats)
+                # Inicializamos diccionario dentro de cada equipo que contendra las estadisticas y la categoria de cada estadistica
+                teams_content[team_name] = {}
+                for category, stat in zip(categories, team_stats):
+                    teams_content[team_name][category] = stat
             
-            
-            pass
+            # Creamos DataFrame con los datos
+            df = pd.DataFrame.from_dict(teams_content)
+            print(df)
+
+
 
         if self.check_accessibility(url_robots=url_robots, url=url_stats):
             print(f"{url_stats} visited!")
@@ -103,18 +130,22 @@ class NBAScraper():
                 self.quit_driver()
                 return
             
-            filters = self.driver.find_elements(by=By.CLASS_NAME, value="DropDown_label__lttfI")
-            print(filters)
-            time.sleep(4)
+            html = self.driver.page_source
+            get_table_contents(html)
 
-            try:
-                wait.until(
-                    EC.element_to_be_clickable((By.CLASS_NAME, "DropDown_content__Bsm3h SplitSelect_select__L8_El nba-stats-primary-split"))
-                ).click()
-                time.sleep(5)
-            except:
-                print("Wait failed!")
-                self.quit_driver()
+
+            # filters = self.driver.find_elements(by=By.CLASS_NAME, value="DropDown_label__lttfI")
+            # print(filters)
+            # time.sleep(4)
+
+            # try:
+            #     wait.until(
+            #         EC.element_to_be_clickable((By.CLASS_NAME, "DropDown_content__Bsm3h SplitSelect_select__L8_El nba-stats-primary-split"))
+            #     ).click()
+            #     time.sleep(5)
+            # except:
+            #     print("Wait failed!")
+            #     self.quit_driver()
             
 
 
