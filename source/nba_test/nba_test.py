@@ -1,6 +1,7 @@
 from urllib import robotparser
 import pandas as pd
 import time
+import numpy as np
 
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -21,6 +22,8 @@ class NBAScraper():
         webdriver_options = ChromeOptions()
         # webdriver_options.add_argument("--headless")
         webdriver_options.add_argument(f"--user-agent={user_agent}")
+        # evitar deteccion como bot (https://stackoverflow.com/questions/71885891/urllib3-exceptions-maxretryerror-httpconnectionpoolhost-localhost-port-5958)
+        webdriver_options.add_argument('--disable-blink-features=AutomationControlled')
         self.driver = webdriver.Chrome(options=webdriver_options)
         
 
@@ -36,51 +39,12 @@ class NBAScraper():
         return self.rp.can_fetch(useragent=self.user_agent, url=url)
     
 
-    def navigate_to(self):
-        url_robots = f"{self.base_url}robots.txt"
-        url_stats = f"{self.base_url}stats"
 
-        if self.check_accessibility(url_robots=url_robots, url=url_stats):
-            print(f"{url_stats} visited!")
-            self.driver.get(url_stats)
-            wait = WebDriverWait(self.driver, 10)
-           
-            try:
-                # https://stackoverflow.com/questions/64032271/handling-accept-cookies-popup-with-selenium-in-python
-                print("Waiting...")
-                wait.until(
-                    EC.element_to_be_clickable((By.ID, "onetrust-accept-btn-handler"))
-                ).click()
-                print("Cookies accepted!")
-            except:
-                print("Wait failed!")
-                self.quit_driver()
-                return
-            
-            time.sleep(2)
-
-            buttons = self.driver.find_elements(by=By.CLASS_NAME, value="SubNavItem_subnavLink__pF1m7")
-            text_button = None
-            for b in buttons:
-                if b.text == "Teams":
-                    text_button = b
-                    break
-                    
-            try:
-                wait.until(
-                    EC.element_to_be_clickable(text_button)
-                ).click()
-                time.sleep(5)
-            except:
-                print("Wait failed!")
-                self.quit_driver()
-
-
-    def extract_teams_shooting_ds(self) -> pd.DataFrame:
+    def extract_teams_shooting_ds(self) -> None:
         url_robots = f"{self.base_url}robots.txt"
         url_stats = f"{self.base_url}stats/teams/shooting"
 
-        def get_table_contents(html):
+        def get_table_contents(html, season):
             # Creamos objeto BeautifulSoup
             soup = BeautifulSoup(html, "html.parser")
 
@@ -93,7 +57,7 @@ class NBAScraper():
             # Crom_headers__mzI_m -> Cabecera perteneciente a FGM, FGA, FG%
             # el apartado field contiene adicionalmente a que rango de tiro pertenece
             categories = [col.get("field") for col in table_head.find("tr", class_="Crom_headers__mzI_m").find_all("th")[1:]]
-            teams_content = dict()
+            df = pd.DataFrame(columns=["Team", "Season"] + categories)
             table_body = teams_table.find("tbody").find_all("tr")
             for tr in table_body:
                 team_info = tr.find_all("td")
@@ -102,21 +66,16 @@ class NBAScraper():
                 
                 # Categorias y estadisticas deben tener la misma longitud, deberia cumplirse siempre
                 assert len(categories) == len(team_stats)
-                # Inicializamos diccionario dentro de cada equipo que contendra las estadisticas y la categoria de cada estadistica
-                teams_content[team_name] = {}
-                for category, stat in zip(categories, team_stats):
-                    teams_content[team_name][category] = stat
+                df = pd.concat([df, pd.DataFrame(data=np.array([[team_name, season] + team_stats]), columns=df.columns)])
             
-            # Creamos DataFrame con los datos
-            df = pd.DataFrame.from_dict(teams_content)
-            print(df)
+            return df
 
 
-
+        # Comprobamos accesibilidad a la pagina
         if self.check_accessibility(url_robots=url_robots, url=url_stats):
             print(f"{url_stats} visited!")
             self.driver.get(url_stats)
-            wait = WebDriverWait(self.driver, 10)
+            wait = WebDriverWait(self.driver, 20)
            
             try:
                 # https://stackoverflow.com/questions/64032271/handling-accept-cookies-popup-with-selenium-in-python
@@ -130,31 +89,58 @@ class NBAScraper():
                 self.quit_driver()
                 return
             
-            html = self.driver.page_source
-            get_table_contents(html)
-
-
-            # filters = self.driver.find_elements(by=By.CLASS_NAME, value="DropDown_label__lttfI")
-            # print(filters)
-            # time.sleep(4)
-
-            # try:
-            #     wait.until(
-            #         EC.element_to_be_clickable((By.CLASS_NAME, "DropDown_content__Bsm3h SplitSelect_select__L8_El nba-stats-primary-split"))
-            #     ).click()
-            #     time.sleep(5)
-            # except:
-            #     print("Wait failed!")
-            #     self.quit_driver()
+            # Esperamos para que la accion de aceptar las cookies no se solape con empezar la extraccion de las tablas, o el programa peta
+            time.sleep(5)
             
+            # Obtenemos el elemento que contiene todos los filtros
+            overall_filters = self.driver.find_element(by=By.CLASS_NAME, value="nba-stats-primary-split-block")
+            # Obtenemos los filtros que aparecen al inicio
+            initial_filters = overall_filters.find_elements(by=By.CLASS_NAME, value="DropDown_label__lttfI")
+
+            # Inicializamos la variable para el dataset
+            final_df = None
+
+            for filt in initial_filters:
+                # Titulo del filtro
+                tag = filt.find_element(by=By.TAG_NAME, value="p").text
+                if tag == "SEASON":
+                    # Obtenemos todas las opciones (años)
+                    options = filt.find_elements(by=By.TAG_NAME, value="option")
+
+                    initial_season = options[0].text
+
+                    # Extraemos el dataframe inicial
+                    html = self.driver.page_source
+                    # Esperamos a que la tabla sea visible
+                    wait.until(EC.visibility_of_element_located((By.CLASS_NAME, "Crom_table__p1iZz")))
+                    final_df = get_table_contents(html=html, season=initial_season)
+
+                    for op in options:
+                        try:
+                            wait.until(
+                                EC.element_to_be_clickable(op)
+                            ).click()
+                        except:
+                            print("Wait failed!")
+                            self.quit_driver()
 
 
+                        curr_season = op.text
+                        # Extraemos el dataframe y lo añadimos al final
+                        html = self.driver.page_source
+                        wait.until(EC.visibility_of_element_located((By.CLASS_NAME, "Crom_table__p1iZz")))
+                        curr_df = get_table_contents(html=html, season=curr_season)
 
-        
+                        if final_df is None:
+                            final_df = curr_df
+                        else:
+                            final_df = pd.concat([final_df, curr_df]) 
+                        
 
-
-        return
-
+                    break
+            
+            final_df.to_csv("..\\..\\dataset\\nba_test_dataset.csv", sep=";", index=False)
+            
 
     # Cerrar driver
     def quit_driver(self):
