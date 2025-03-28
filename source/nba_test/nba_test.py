@@ -18,6 +18,8 @@ class NBAScraper():
         self.user_agent = user_agent
         self.base_url = "https://www.nba.com/"
 
+        # TODO: Implementar proxy para que la pagina no me bloquee cuando hago muchas ejecuciones
+
         # https://developer.chrome.com/docs/chromedriver/capabilities?hl=es-419
         webdriver_options = ChromeOptions()
         # webdriver_options.add_argument("--headless")
@@ -139,7 +141,7 @@ class NBAScraper():
 
                     break
             
-            final_df.to_csv("..\\..\\dataset\\nba_test_dataset.csv", sep=";", index=False)
+            final_df.to_csv("..\\..\\dataset\\nba_test_dataset.csv", sep=",", index=False)
             
 
     # Cerrar driver
