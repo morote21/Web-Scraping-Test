@@ -46,7 +46,7 @@ class NBAScraper():
         url_robots = f"{self.base_url}robots.txt"
         url_stats = f"{self.base_url}stats/teams/shooting"
 
-        def get_table_contents(html, season):
+        def get_table_contents(html, season, conference, position):
             # Creamos objeto BeautifulSoup
             soup = BeautifulSoup(html, "html.parser")
 
@@ -59,7 +59,7 @@ class NBAScraper():
             # Crom_headers__mzI_m -> Cabecera perteneciente a FGM, FGA, FG%
             # el apartado field contiene adicionalmente a que rango de tiro pertenece
             categories = [col.get("field") for col in table_head.find("tr", class_="Crom_headers__mzI_m").find_all("th")[1:]]
-            df = pd.DataFrame(columns=["Team", "Season"] + categories)
+            df = pd.DataFrame(columns=["Team", "Season", "Conference", "Position"] + categories)
             table_body = teams_table.find("tbody").find_all("tr")
             for tr in table_body:
                 team_info = tr.find_all("td")
@@ -68,7 +68,7 @@ class NBAScraper():
                 
                 # Categorias y estadisticas deben tener la misma longitud, deberia cumplirse siempre
                 assert len(categories) == len(team_stats)
-                df = pd.concat([df, pd.DataFrame(data=np.array([[team_name, season] + team_stats]), columns=df.columns)])
+                df = pd.concat([df, pd.DataFrame(data=np.array([[team_name, season, conference, position] + team_stats]), columns=df.columns)])
             
             return df
 
@@ -93,55 +93,126 @@ class NBAScraper():
             
             # Esperamos para que la accion de aceptar las cookies no se solape con empezar la extraccion de las tablas, o el programa peta
             time.sleep(5)
+
+            # Cargamos los filtros avanzados para poder hacer búsqueda por conferencias
+            try:
+                print("Intentando abrir Advanced Filters...")
+                toggle_button = wait.until(EC.element_to_be_clickable(
+                    (By.CSS_SELECTOR, "button.StatsAdvancedFiltersPanel_safArrow__EqRgu")
+                ))
+                toggle_button.click()
+                time.sleep(3)  # Pequeña espera para que los filtros se desplieguen correctamente
+                print("Advanced Filters abiertos.")
+            except Exception as e:
+                print("No se pudo abrir el panel de filtros avanzados.")
+                print(str(e))
+                self.quit_driver()
+                return
+
+            # Obtenemos el boton para aplicar los filtros
+            get_stats_button = None
+            try:
+                for button in self.driver.find_elements(by=By.CLASS_NAME, value="Button_button__L2wUb"):
+                    if button.text.lower() == "get stats":
+                        get_stats_button = button
+            except:
+                print("No se pudo acceder a los botones.")
+                print(str(e))
+                self.quit_driver()
+                return
+            
+            # Nos aseguramos de tener boton para aplicar los filtros
+            assert get_stats_button != None
             
             # Obtenemos el elemento que contiene todos los filtros
             overall_filters = self.driver.find_element(by=By.CLASS_NAME, value="nba-stats-primary-split-block")
             # Obtenemos los filtros que aparecen al inicio
             initial_filters = overall_filters.find_elements(by=By.CLASS_NAME, value="DropDown_label__lttfI")
 
+            # Obtenemos todas las temporadas
+            season_options = []
+            for filt in initial_filters:
+                tag = filt.find_element(by=By.TAG_NAME, value="p").text
+                if tag.upper() == "SEASON":
+                    season_options = filt.find_elements(by=By.TAG_NAME, value="option")
+                    break
+            
+            # Obtenemos todas las conferencias
+            conference_options = []
+            for filt in initial_filters:
+                tag = filt.find_element(by=By.TAG_NAME, value="p").text
+                if tag.upper() == "CONFERENCE":
+                        conference_options = [
+                            opt for opt in filt.find_elements(by=By.TAG_NAME, value="option")
+                            if opt.text in ["East", "West"]
+                        ]
+                        break
+            
+            # Obtenemos todas las posiciones de jugador
+            positions_options = []
+            for filt in initial_filters:
+                tag = filt.find_element(by=By.TAG_NAME, value="p").text
+                if tag.upper() == "POSITION":
+                        positions_options = [
+                            opt for opt in filt.find_elements(by=By.TAG_NAME, value="option")
+                            if opt.text in ["Center", "Guard", "Forward"]
+                        ]
+                        break
+   
+
             # Inicializamos la variable para el dataset
             final_df = None
 
-            for filt in initial_filters:
-                # Titulo del filtro
-                tag = filt.find_element(by=By.TAG_NAME, value="p").text
-                if tag == "SEASON":
-                    # Obtenemos todas las opciones (años)
-                    options = filt.find_elements(by=By.TAG_NAME, value="option")
-
-                    initial_season = options[0].text
-
-                    # Extraemos el dataframe inicial
-                    html = self.driver.page_source
-                    # Esperamos a que la tabla sea visible
-                    wait.until(EC.visibility_of_element_located((By.CLASS_NAME, "Crom_table__p1iZz")))
-                    final_df = get_table_contents(html=html, season=initial_season)
-
-                    for op in options:
+            # Iteramos por todas las combinaciones de filtros
+            for season_op in season_options:
+                season_text = season_op.text
+                try:
+                    wait.until(EC.element_to_be_clickable(season_op)).click()
+                    time.sleep(1)
+                except:
+                    print("Wait failed!")
+                    self.quit_driver()
+                
+                for conf_op in conference_options:
+                    conf_text = conf_op.text
+                    try:
+                        wait.until(EC.element_to_be_clickable(conf_op)).click()
+                        time.sleep(1)
+                    except:
+                        print("Wait failed!")
+                        self.quit_driver()
+                    
+                    for pos_op in positions_options:
+                        pos_text = pos_op.text
+                        time.sleep(1)
                         try:
-                            wait.until(
-                                EC.element_to_be_clickable(op)
-                            ).click()
+                            wait.until(EC.element_to_be_clickable(pos_op)).click()
+                        except:
+                            print("Wait failed!")
+                            self.quit_driver()
+                        
+                        # Aplicamos los filtros
+                        try:
+                            wait.until(EC.element_to_be_clickable(get_stats_button)).click()
                         except:
                             print("Wait failed!")
                             self.quit_driver()
 
-
-                        curr_season = op.text
-                        # Extraemos el dataframe y lo añadimos al final
-                        html = self.driver.page_source
+                        time.sleep(1)
+                        # Esperamos a que la tabla sea visible
                         wait.until(EC.visibility_of_element_located((By.CLASS_NAME, "Crom_table__p1iZz")))
-                        curr_df = get_table_contents(html=html, season=curr_season)
+                        # Extraemos el dataframe inicial
+                        html = self.driver.page_source
 
+                        curr_df = get_table_contents(html=html, season=season_text, conference=conf_text, position=pos_text)
                         if final_df is None:
                             final_df = curr_df
                         else:
                             final_df = pd.concat([final_df, curr_df]) 
-                        
 
-                    break
-            
+            # Guardanis resultados en ambos formatos
             final_df.to_csv("..\\..\\dataset\\nba_test_dataset.csv", sep=",", index=False)
+            final_df.to_csv("..\\..\\dataset\\nba_test_dataset_excel.csv", sep=";", index=False)
             
 
     # Cerrar driver
