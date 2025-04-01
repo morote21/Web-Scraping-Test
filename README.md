@@ -1,6 +1,6 @@
 # NBA Stats Web Scraper
 
-Este proyecto automatiza la recolección de estadísticas de jugadores de la NBA desde la web oficial [nba.com/stats]((https://www.nba.com/stats/teams/shooting)), utilizando Selenium para interactuar con el sitio y BeautifulSoup para parsear el HTML renderizado.
+Este proyecto automatiza la recolección de estadísticas de jugadores de la NBA desde la web oficial [nba.com/stats](https://www.nba.com/stats/teams/shooting), utilizando Selenium para interactuar con el sitio y BeautifulSoup para parsear el HTML renderizado.
 
 ## 📦 Requisitos
 
