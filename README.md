@@ -1,4 +1,5 @@
-# NBA Stats Web Scraper
+
+# 🏀 NBA Stats Web Scraper
 
 Este proyecto automatiza la recolección de estadísticas de equipos de la NBA desde la web oficial [nba.com/stats](https://www.nba.com/stats), utilizando Selenium para interactuar con el sitio y BeautifulSoup para extraer los datos HTML renderizados.
 
@@ -6,7 +7,7 @@ El objetivo es construir un conjunto de datos con información ofensiva y defens
 
 ## 📦 Requisitos
 
-⚠️ Este proyecto utiliza Selenium con el navegador Chrome, por lo que es necesario tener `chromedriver` en el mismo directorio donde se ejecuta el script `.py`.
+Este proyecto utiliza Selenium con el navegador Chrome, por lo que es necesario tener `chromedriver` en el mismo directorio donde se ejecuta el script.
 
 Puedes descargarlo desde: https://sites.google.com/chromium.org/driver/
 
@@ -21,7 +22,7 @@ pip install -r requirements.txt
 1. Ejecuta el script principal:
 
 ```bash
-python nba_test.py.py
+python nba_test_timeouts_https_contests.py
 ```
 
 2. El script:
@@ -35,13 +36,13 @@ python nba_test.py.py
 
 ## 📁 Estructura del proyecto
 
-- `source/Scarp_NBA_Stats_Selenium_Beautifulsoup.py`: Script principal con Selenium + BeautifulSoup.
-- `dataset/`: Carpeta donde se guarda el archivo CSV generado.
-- `requirements.txt`: Lista de librerías necesarias (Selenium, BeautifulSoup, pandas, etc.).
+- `nba_test_timeouts_https_contests.py`: Script principal con Selenium + BeautifulSoup
+- `dataset/`: Carpeta donde se guarda el CSV generado
+- `requirements.txt`: Lista de librerías necesarias
 
 ## ⏱️ Tiempo de ejecución
 
-El script imprime en consola el tiempo total que tardó en completarse el scraping.
+El script imprime en consola el tiempo total que tarda en completarse el scraping completo de todas las temporadas.
 
 ## 📌 Origen de los datos
 
@@ -61,10 +62,9 @@ Esto implica que:
 - Puedes usar, compartir y adaptar el contenido para fines no comerciales
 - Debes reconocer la fuente original (NBA.com) y los autores de este proyecto
 - Cualquier trabajo derivado debe compartirse bajo la misma licencia
-  
-## 🧑‍💻 Autores
 
-Proyecto desarrollado por :
-Etel silva Garcia: esilgar@uoc.edu
-José Morote: josemorote21@uoc.edu
+## 👥 Autores
 
+Proyecto desarrollado por:
+- **Etel Silva García** – esilgar@gmail.com  
+- **José Morote** – josemorote21@gmail.com
