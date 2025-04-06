@@ -598,7 +598,7 @@ class NBAScraper():
                         time.sleep(response_delay)
             
 
-        return final_df   
+        return final_df
 
 
 
