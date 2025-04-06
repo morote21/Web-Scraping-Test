@@ -22,6 +22,7 @@ for c in float_cols:
 df_gb_mean = df.groupby(["Season", "Conference", "Position"]).mean(numeric_only=True)
 df_gb_std = df.groupby(["Season", "Conference", "Position"]).std(numeric_only=True)
 
+# Funcion para randomizar los valores de las filas, pero a partir de los valores originales para mantener cierta distribucion logica
 def randomize(r):
     r_copy = r.copy()
 
